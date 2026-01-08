@@ -1,6 +1,7 @@
 import * as ImagePicker from 'expo-image-picker';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ImageSourcePropType, StyleSheet, View } from 'react-native';
+import { captureRef } from 'react-native-view-shot';
 
 import Button from '@/components/Button';
 import CircleButton from '@/components/CircleButton';
@@ -9,10 +10,14 @@ import EmojiPicker from '@/components/EmojiPicker';
 import EmojiSticker from '@/components/EmojiSticker';
 import IconButton from '@/components/IconButton';
 import ImageViewer from '@/components/ImageViewer';
+import * as MediaLibrary from 'expo-media-library';
 
 const PlaceholderImage = require('@/assets/images/background-image.png');
 
+
 export default function Index() {
+
+  const [permissionResponse,requestPermission] = MediaLibrary.usePermissions()
 
   const [selectedImage, setSelectImage] = useState<string | undefined>(undefined);
   const [showAppOptions, setShowAppOptions] = useState<boolean>(false);
@@ -20,7 +25,12 @@ export default function Index() {
   const [pickedEmoji, setPickedEmoji] = useState<ImageSourcePropType | undefined>(undefined);
 
 
+  const imageRef = useRef<View>(null);
 
+  useEffect(()=>{
+    if (!permissionResponse?.granted)
+      requestPermission();
+  },[])
 
   //https://docs.expo.dev/tutorial/image-picker/
   const pickerImageAsync = async () => {
@@ -46,39 +56,57 @@ export default function Index() {
   const onAddSticker = () => {
     setIsModalVisible(true)
   };
-  const onSaveImageAsync = async () => {
-  };
+
 
   const onModalClose = () => {
     setIsModalVisible(false);
   };
-  
+
+
+  const onSaveImageAsync = async () => {
+    try {
+      const localUri = await captureRef(imageRef, {
+        height: 440,
+        quality: 1,
+      });
+
+      await MediaLibrary.saveToLibraryAsync(localUri);
+      if (localUri) {
+        alert('Saved!');
+      }
+    } catch (e) {
+      console.log(e);
+    }
+  };
+
 
   return (
     <View style={styles.container}>
       <View style={styles.imageContainer}>
-        <ImageViewer imgSource={PlaceholderImage} selectedImage={selectedImage} />
-        {pickedEmoji && <EmojiSticker imageSize={40} stickerSource={pickedEmoji} />}
+        <View ref={imageRef} collapsable={false}>
+          <ImageViewer imgSource={PlaceholderImage} selectedImage={selectedImage} />
+          {pickedEmoji && <EmojiSticker imageSize={40} stickerSource={pickedEmoji} />}
+        </View>
       </View>
       {
         showAppOptions ? (
           <View style={styles.optionsContainer}>
-          <View style={styles.optionsRow}>
-            <IconButton icon="refresh" label="Reset" onPress={onReset} />
-            <CircleButton onPress={onAddSticker} />
-            <IconButton icon="save-alt" label="Save" onPress={onSaveImageAsync} />
+            <View style={styles.optionsRow}>
+              <IconButton icon="refresh" label="Reset" onPress={onReset} />
+              <CircleButton onPress={onAddSticker} />
+              <IconButton icon="save-alt" label="Save" onPress={onSaveImageAsync} />
+            </View>
           </View>
-        </View>
         ) : (
 
           <View style={styles.footerContainer}>
             <Button label="Choose a photo" theme="primary" onPress={pickerImageAsync} />
-            <Button label="Use this photo" onPress={()=>{setShowAppOptions(true)}}/>
+            <Button label="Use this photo" onPress={() => { setShowAppOptions(true) }} />
           </View>
         )
       }
       <EmojiPicker isVisible={isModalVisible} onClose={onModalClose}>
-        <EmojiList onSelect={setPickedEmoji} onCloseModal={onModalClose}/>
+        <EmojiList onSelect={setPickedEmoji} onCloseModal={onModalClose} />
       </EmojiPicker>
     </View>
   );
